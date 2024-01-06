@@ -1,0 +1,9 @@
+{
+  "vocab_size": 30522,
+  "num_layers": 12,
+  "num_heads": 12,
+  "hidden_size": 768,
+  "max_seq_len": 2048,
+  "ffn_multiplier": 4,
+  "dropout": 0.1
+}
