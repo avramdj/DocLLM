@@ -15,10 +15,13 @@ tqdm = "*"
 hydra-core = "*"
 einops = "*"
 jaxtyping = "*"
+sentencepiece = "*"
 
 [dev-packages]
 pre-commit = "*"
 ipython = "*"
+requests = "*"
+ruff = "*"
 
 [requires]
 python_version = "3.11"

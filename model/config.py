@@ -28,6 +28,7 @@ class DocLLMConfig(Config):
     max_seq_len: int
     ffn_multiplier: int
     dropout: float
+    batch_size: int
 
     @property
     def head_dim(self):

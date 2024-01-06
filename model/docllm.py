@@ -1,10 +1,10 @@
-from typing import Sequence, TypeAlias
+from typing import Callable, Sequence, TypeAlias
 
 import torch
 from torch import Tensor
 from torch import nn
 from torch.nn import functional as F
-from jaxtyping import Float
+from jaxtyping import Float, Int, Bool
 import einops
 
 from .config import DocLLMConfig
@@ -111,7 +111,7 @@ class GroupedQueryAttention(nn.Module):  # For now, just vanilla attention
         k = self.rotary_emb(k)
         attn_weights = torch.einsum("bhsd, bhSd -> bhsS", q, k)
         attn_weights = attn_weights * torch.rsqrt(torch.tensor(self.head_dim).float())
-        if mask:
+        if mask is not None:
             attn_weights = attn_weights.masked_fill(mask, float("-inf"))
         attn_weights = F.softmax(attn_weights, dim=-1)
         attn_weights = F.dropout(
@@ -166,25 +166,20 @@ class TransformerDecoder(nn.Module):
         )
         self.pre_out_norm = RMSNorm(config.hidden_size)
         self.out_proj = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        self.register_buffer("umask", torch.triu(
+                torch.ones(config.max_seq_len, config.max_seq_len, dtype=torch.bool), diagonal=1
+            ))
 
-    def forward(self, x: Float[Tensor, "b s hd"]) -> Float[Tensor, "b s hd"]:
+    def forward(
+        self, x: Int[Tensor, "b s"], mask: Bool[Tensor, "b s"] | None = None
+    ) -> Float[Tensor, "b s vocab_size"]:
         x = self.embedding(x)
+        if mask is None:
+            mask = torch.zeros(x.shape[-2], x.shape[-2], dtype=torch.bool).to(x.device)
+        mask = mask | self.umask[: x.shape[-2], : x.shape[-2]].to(x.device)
         for layer in self.layers:
-            x = layer(x, mask=None)
+            x = layer(x, mask=mask)
         x = self.pre_out_norm(x)
         x = self.out_proj(x)
         x = F.softmax(x, dim=-1)
         return x
-
-
-class DocLLM:
-    """DocLLM model."""
-
-    def __init__(self, config: DocLLMConfig) -> None:
-        super().__init__()
-        self.config = config
-        self.tokenizer = ...
-        self.decoder = TransformerDecoder(config)
-
-    def forward(self, x: Float[Tensor, "b s"]):
-        return self.decoder(x)

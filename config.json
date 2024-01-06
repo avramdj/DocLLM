@@ -1,9 +1,10 @@
 {
-  "vocab_size": 30522,
-  "num_layers": 12,
-  "num_heads": 12,
-  "hidden_size": 768,
-  "max_seq_len": 2048,
+  "vocab_size": -1,
+  "num_layers": 4,
+  "num_heads": 4,
+  "hidden_size": 128,
+  "max_seq_len": 256,
   "ffn_multiplier": 4,
-  "dropout": 0.1
+  "dropout": 0.1,
+  "batch_size": 64
 }
