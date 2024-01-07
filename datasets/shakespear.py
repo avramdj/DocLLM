@@ -27,7 +27,8 @@ class Tokenizer:
             spm.SentencePieceTrainer.train(
                 f"--input={tmptxt} --model_prefix={self.model_prefix} "
                 f"--control_symbols={','.join(special_tokens)} "
-                f"--vocab_size={self._vocab_size} --model_type={self.model_type}"
+                f"--vocab_size={self._vocab_size} --model_type={self.model_type} "
+                "--minloglevel=5"
             )
         sp = spm.SentencePieceProcessor()
         sp.load(f"{self.model_prefix}.model")
@@ -80,11 +81,11 @@ class Dataset(torch.utils.data.Dataset):
 
 
 def get_shakespear_dataload_and_tokenizer(
-    batch_size: int, max_length: int, overlap: int
+    vocab_size: int, batch_size: int, max_length: int, overlap: int
 ) -> tuple[torch.utils.data.DataLoader, Tokenizer]:
     url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
     corpus = download_text(url)
-    tokenizer = Tokenizer(corpus)
+    tokenizer = Tokenizer(corpus, vocab_size=vocab_size)
     dataset = Dataset(corpus, tokenizer, max_length=max_length, overlap=overlap)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, shuffle=True

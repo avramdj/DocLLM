@@ -189,14 +189,33 @@ class TransformerDecoder(nn.Module):
         return x
 
     def generate(
-        self, context_ids: Int[Tensor, " s"], eos_id: int, max_length: int = 100
+        self,
+        context_ids: Int[Tensor, " s"],
+        eos_id: int,
+        max_length: int = 100,
+        temperature: float = 1.0,
+        top_p: float = 1.0,
     ) -> Int[Tensor, " s"]:
         context_ids = context_ids.unsqueeze(0)
         with torch.inference_mode():
             for _ in range(max_length):
                 output = self(context_ids)
-                next_token = output[:, -1].argmax(dim=-1)
+                logits = output[:, -1] / temperature
+                filtered_logits = top_p_filtering(logits, top_p)
+                probabilities = F.softmax(filtered_logits, dim=-1)
+                next_token = torch.multinomial(probabilities, num_samples=1)
                 if next_token.item() == eos_id:
                     break
-                context_ids = torch.cat([context_ids, next_token.unsqueeze(0)], dim=-1)
+                context_ids = torch.cat([context_ids, next_token], dim=-1)
         return context_ids[0]
+
+
+def top_p_filtering(logits: Float[Tensor, " s"], top_p: float) -> Float[Tensor, " s"]:
+    sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+    cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+    sorted_indices_to_remove = cumulative_probs > top_p
+    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+    sorted_indices_to_remove[..., 0] = 0
+    indices_to_remove = sorted_indices[sorted_indices_to_remove]
+    logits[indices_to_remove] = float("-inf")
+    return logits

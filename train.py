@@ -10,7 +10,7 @@ from model.config import DocLLMConfig
 from datasets.shakespear import get_shakespear_dataload_and_tokenizer
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--use-checkpoint", action="store_true")
+parser.add_argument("--load-last", action="store_true")
 args = parser.parse_args()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -23,23 +23,34 @@ os.makedirs(checkpoint_dir, exist_ok=True)
 
 config = DocLLMConfig.from_json("config.json")
 dataloader, tokenizer = get_shakespear_dataload_and_tokenizer(
+    vocab_size=config.vocab_size,
     batch_size=config.batch_size,
     max_length=config.max_seq_len,
     overlap=config.max_seq_len // 4,
 )
 
 config.vocab_size = tokenizer.vocab_size()
-if args.use_checkpoint:
+model = TransformerDecoder(config=config)
+model.to(device)
+optimizer = AdamW(model.parameters(), lr=1e-3)
+start_ep = 0
+
+if args.load_last and os.listdir(checkpoint_dir):
     checkpoint_path = os.path.join(
         checkpoint_dir, sorted(os.listdir(checkpoint_dir))[-1]
     )
-    model = torch.load(checkpoint_path)
-else:
+    print(f"Loading {checkpoint_path}")
+    loaded = torch.load(checkpoint_path)
+    start_ep = loaded["epoch"] + 1
     model = TransformerDecoder(config=config)
+    model.load_state_dict(loaded["model_state_dict"])
+    model.to(device)
+    optimizer = AdamW(model.parameters(), lr=1e-3)
+    optimizer.load_state_dict(loaded["optimizer_state_dict"])
+else:
+    print("Training from scratch...")
 
 epochs = 1000
-optimizer = AdamW(model.parameters(), lr=1e-3)
-
 warmup_steps = 100
 total_steps = len(dataloader) * epochs
 scheduler = LambdaLR(
@@ -49,9 +60,8 @@ scheduler = LambdaLR(
     ),
 )
 
-model.to(device)
-
-for epoch in range(epochs):
+for epoch in range(start_ep, epochs + start_ep):
+    print(f"Epoch {epoch}/{epochs + start_ep}")
     model.train()
 
     with torch.inference_mode():
@@ -93,8 +103,9 @@ for epoch in range(epochs):
         },
         checkpoint_path,
     )
-    previous_checkpoint_path = os.path.join(
-        checkpoint_dir, f"checkpoint_{epoch - 1}.pt"
-    )
-    if os.path.exists(previous_checkpoint_path):
-        os.remove(previous_checkpoint_path)
+    checkpoint_files = sorted(os.listdir(checkpoint_dir))
+    for file in checkpoint_files:
+        if file == f"checkpoint_{epoch}.pt":
+            continue
+        file_path = os.path.join(checkpoint_dir, file)
+        os.remove(file_path)

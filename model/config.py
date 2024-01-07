@@ -30,6 +30,7 @@ class DocLLMConfig(Config):
     ffn_multiplier: int
     dropout: float
     batch_size: int
+    learning_rate: float
 
     @property
     def head_dim(self):
