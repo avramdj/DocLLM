@@ -17,6 +17,7 @@ class Config:
         with open(json_path, "w") as f:
             json.dump(self.__dict__, f)
 
+
 @dataclass
 class DocLLMConfig(Config):
     """Configuration for DocLLM."""
@@ -33,7 +34,7 @@ class DocLLMConfig(Config):
     @property
     def head_dim(self):
         return self.hidden_size // self.num_heads
-    
+
     @property
     def ffn_expanded_size(self):
         return self.hidden_size * self.ffn_multiplier

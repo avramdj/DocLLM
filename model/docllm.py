@@ -1,4 +1,4 @@
-from typing import Callable, Sequence, TypeAlias
+from typing import Sequence, TypeAlias
 
 import torch
 from torch import Tensor
@@ -166,9 +166,13 @@ class TransformerDecoder(nn.Module):
         )
         self.pre_out_norm = RMSNorm(config.hidden_size)
         self.out_proj = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        self.register_buffer("umask", torch.triu(
-                torch.ones(config.max_seq_len, config.max_seq_len, dtype=torch.bool), diagonal=1
-            ))
+        self.register_buffer(
+            "umask",
+            torch.triu(
+                torch.ones(config.max_seq_len, config.max_seq_len, dtype=torch.bool),
+                diagonal=1,
+            ),
+        )
 
     def forward(
         self, x: Int[Tensor, "b s"], mask: Bool[Tensor, "b s"] | None = None
@@ -183,3 +187,16 @@ class TransformerDecoder(nn.Module):
         x = self.out_proj(x)
         x = F.softmax(x, dim=-1)
         return x
+
+    def generate(
+        self, context_ids: Int[Tensor, " s"], eos_id: int, max_length: int = 100
+    ) -> Int[Tensor, " s"]:
+        context_ids = context_ids.unsqueeze(0)
+        with torch.inference_mode():
+            for _ in range(max_length):
+                output = self(context_ids)
+                next_token = output[:, -1].argmax(dim=-1)
+                if next_token.item() == eos_id:
+                    break
+                context_ids = torch.cat([context_ids, next_token.unsqueeze(0)], dim=-1)
+        return context_ids[0]

@@ -1,0 +1,18 @@
+fail_fast: true
+
+repos:
+  - repo: local
+    hooks:
+    - id: ruff-formatter
+      name: ruff-formatter
+      entry: pipenv run ruff format
+      language: system
+      types: [python]
+
+    - id: ruff
+      name: ruff
+      entry: pipenv run ruff
+      language: system
+      types: [python]
+      args: [--exit-non-zero-on-fix]
+      
